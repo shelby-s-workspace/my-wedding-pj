@@ -1,0 +1,74 @@
+name: Deploy to Local PC
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'claude/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Local PC via Self-Hosted Runner
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create target directory if not exists
+        shell: powershell
+        run: |
+          $targetDir = "D:\claude-project"
+          if (-not (Test-Path $targetDir)) {
+            New-Item -ItemType Directory -Path $targetDir -Force
+            Write-Host "Created directory: $targetDir"
+          } else {
+            Write-Host "Directory already exists: $targetDir"
+          }
+
+      - name: Deploy files to local PC
+        shell: powershell
+        run: |
+          $sourceDir = "${{ github.workspace }}"
+          $targetDir = "D:\claude-project"
+
+          Write-Host "Deploying from: $sourceDir"
+          Write-Host "Deploying to:   $targetDir"
+
+          # Copy all files (exclude .git directory)
+          robocopy $sourceDir $targetDir /E /XD ".git" /XF "*.log" /NJH /NJS
+
+          # robocopy returns exit code 1 on success (files copied), treat as success
+          if ($LASTEXITCODE -le 7) {
+            Write-Host "Deployment successful!"
+            exit 0
+          } else {
+            Write-Host "Deployment failed with exit code: $LASTEXITCODE"
+            exit 1
+          }
+
+      - name: Write deploy log
+        shell: powershell
+        run: |
+          $logPath = "D:\claude-project\deploy.log"
+          $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+          $commitSha = "${{ github.sha }}"
+          $branch = "${{ github.ref_name }}"
+          $actor = "${{ github.actor }}"
+
+          $logEntry = "[$timestamp] Deployed branch '$branch' (commit: $commitSha) by $actor"
+          Add-Content -Path $logPath -Value $logEntry
+          Write-Host $logEntry
+
+      - name: Deployment complete
+        shell: powershell
+        run: |
+          Write-Host "========================================"
+          Write-Host "  Deployment to D:\claude-project Done  "
+          Write-Host "========================================"
+          Write-Host "Repository : ${{ github.repository }}"
+          Write-Host "Branch     : ${{ github.ref_name }}"
+          Write-Host "Commit     : ${{ github.sha }}"
+          Write-Host "Triggered by: ${{ github.actor }}"

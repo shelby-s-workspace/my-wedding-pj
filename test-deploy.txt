@@ -1,0 +1,15 @@
+==================================================
+  GitHub Actions -> Local PC 배포 테스트 파일
+==================================================
+
+이 파일이 D:\claude-project 에 존재한다면
+GitHub Actions 워크플로우를 통한 로컬 배포가
+정상적으로 작동하고 있는 것입니다.
+
+워크플로우: Deploy to Local PC
+생성일: 2026-02-20
+저장소: shelby-s-workspace/my-wedding-pj
+
+[배포 흐름]
+  Claude Code → GitHub Push → Actions Runner → Local PC (D:\claude-project)
+==================================================
