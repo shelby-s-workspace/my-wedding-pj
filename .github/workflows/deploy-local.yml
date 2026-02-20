@@ -62,44 +62,6 @@ jobs:
           Add-Content -Path $logPath -Value $logEntry
           Write-Host $logEntry
 
-      - name: Push deployed files back to GitHub
-        shell: powershell
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $deployDir = "D:\claude-project"
-          $workspaceDir = "${{ github.workspace }}"
-          $branch = "${{ github.ref_name }}"
-
-          # Copy deployed files back into the workspace (excluding .git and logs)
-          robocopy $deployDir $workspaceDir /E /XD ".git" /XF "*.log" /NJH /NJS
-          if ($LASTEXITCODE -gt 7) {
-            Write-Host "robocopy failed with exit code: $LASTEXITCODE"
-            exit 1
-          }
-
-          Set-Location $workspaceDir
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Set remote URL with token for push auth
-          $repoUrl = "https://x-access-token:$env:GITHUB_TOKEN@github.com/${{ github.repository }}.git"
-          git remote set-url origin $repoUrl
-
-          git add -A
-
-          # Only commit if there are actual changes
-          $status = git status --porcelain
-          if ($status) {
-            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-            git commit -m "chore: sync deployed files ($timestamp) [skip ci]"
-            git push origin $branch
-            Write-Host "Pushed deployed files to GitHub branch: $branch"
-          } else {
-            Write-Host "No changes to push."
-          }
-
       - name: Deployment complete
         shell: powershell
         run: |
