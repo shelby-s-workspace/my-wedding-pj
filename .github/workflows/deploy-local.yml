@@ -11,7 +11,7 @@ on:
 jobs:
   deploy:
     name: Deploy to Local PC via Self-Hosted Runner
-    runs-on: self-hosted
+    runs-on: [self-hosted, Windows, X64]
 
     steps:
       - name: Checkout repository
