@@ -8,6 +8,7 @@ GitHub Actions 워크플로우를 통한 로컬 배포가
 
 워크플로우: Deploy to Local PC
 생성일: 2026-02-20
+재테스트: runs-on [self-hosted, Windows, X64] 레이블 매칭 확인
 저장소: shelby-s-workspace/my-wedding-pj
 
 [배포 흐름]
