@@ -20,7 +20,7 @@ jobs:
       - name: Create target directory if not exists
         shell: powershell
         run: |
-          $targetDir = "D:\claude-project"
+          $targetDir = "D:\project\claude-test"
           if (-not (Test-Path $targetDir)) {
             New-Item -ItemType Directory -Path $targetDir -Force
             Write-Host "Created directory: $targetDir"
@@ -32,7 +32,7 @@ jobs:
         shell: powershell
         run: |
           $sourceDir = "${{ github.workspace }}"
-          $targetDir = "D:\claude-project"
+          $targetDir = "D:\project\claude-test"
 
           Write-Host "Deploying from: $sourceDir"
           Write-Host "Deploying to:   $targetDir"
@@ -52,7 +52,7 @@ jobs:
       - name: Write deploy log
         shell: powershell
         run: |
-          $logPath = "D:\claude-project\deploy.log"
+          $logPath = "D:\project\claude-test\deploy.log"
           $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
           $commitSha = "${{ github.sha }}"
           $branch = "${{ github.ref_name }}"
@@ -66,7 +66,7 @@ jobs:
         shell: powershell
         run: |
           Write-Host "========================================"
-          Write-Host "  Deployment to D:\claude-project Done  "
+          Write-Host "  Deployment to D:\project\claude-test Done  "
           Write-Host "========================================"
           Write-Host "Repository : ${{ github.repository }}"
           Write-Host "Branch     : ${{ github.ref_name }}"
