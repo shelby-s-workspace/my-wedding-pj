@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>부동산 매물 분석 보고서</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f5f6fa; font-size: 14px; }
+
+    /* 헤더 */
+    .report-header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 1.5rem; }
+    .report-header h1 { font-size: 1.6rem; font-weight: 700; margin: 0; }
+    .report-header .subtitle { opacity: 0.7; font-size: 0.85rem; margin-top: 4px; }
+
+    /* 점수 색상 */
+    .score-high  { color: #198754; font-weight: 700; }
+    .score-mid   { color: #e67e22; font-weight: 700; }
+    .score-low   { color: #dc3545; font-weight: 700; }
+    .score-num   { font-size: 1.15rem; }
+
+    /* 순위 */
+    .rank-1 { color: #f39c12; font-size: 1.2rem; font-weight: 800; }
+    .rank-2 { color: #95a5a6; font-size: 1.2rem; font-weight: 800; }
+    .rank-3 { color: #cd7f32; font-size: 1.2rem; font-weight: 800; }
+    .rank-n { color: #adb5bd; font-size: 1rem; font-weight: 600; }
+
+    /* 배지 */
+    .tag-preferred { background:#0d6efd; color:#fff; border-radius:4px; padding:1px 7px; font-size:0.72rem; white-space:nowrap; }
+    .tag-subway    { background:#198754; color:#fff; border-radius:4px; padding:1px 7px; font-size:0.72rem; white-space:nowrap; }
+
+    /* 테이블 */
+    th { background:#f1f3f5; white-space:nowrap; font-size:0.82rem; }
+    td { vertical-align: middle; }
+    .article-name { font-weight:600; font-size:0.92rem; }
+    .price-main   { font-weight:700; color:#0d6efd; font-size:0.95rem; }
+    .price-sub    { font-size:0.78rem; color:#6c757d; }
+    .addr-text    { font-size:0.82rem; color:#555; }
+    .sub-score    { font-size:0.76rem; color:#6c757d; line-height:1.6; }
+
+    /* 진행 바 */
+    .progress { height:5px; border-radius:3px; }
+
+    /* 카드 */
+    .stat-card { border:none; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+
+    /* 탭 */
+    .nav-tabs .nav-link { font-weight:600; color:#495057; }
+    .nav-tabs .nav-link.active { color:#0d6efd; }
+
+    /* 조건 요약 */
+    .criteria-card { border:none; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body>
+<div class="container-fluid py-4 px-3 px-md-4" style="max-width:1400px">
+
+  <!-- 헤더 -->
+  <div class="report-header mb-4">
+    <h1>🏠 부동산 매물 분석 보고서</h1>
+    <div class="subtitle">생성일시: {{ generated_at }} &nbsp;|&nbsp; 검색 대상: 서울특별시 전체</div>
+  </div>
+
+  <!-- 검색 조건 요약 -->
+  <div class="card criteria-card mb-4">
+    <div class="card-header fw-bold bg-white border-bottom">검색 조건 요약</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <h6 class="fw-semibold text-muted mb-2">매매 조건</h6>
+          <ul class="list-unstyled mb-0 small">
+            <li>💰 가격: <b>{{ (config.search.purchase.min_price // 10000) }}억 ~ {{ (config.search.purchase.max_price // 10000) }}억원</b></li>
+            <li>📐 최소 면적: <b>전용 {{ config.search.min_area_sqm }}㎡ 이상</b> <span class="text-muted">(약 {{ (config.search.min_area_sqm / 3.3058)|round|int }}평 이상)</span></li>
+          </ul>
+        </div>
+        <div class="col-md-4">
+          <h6 class="fw-semibold text-muted mb-2">선호 지역 <span class="text-primary">(보너스 점수)</span></h6>
+          <div>
+            {% for d in config.search.preferred_districts %}
+            <span class="badge bg-primary me-1 mb-1" style="font-size:0.78rem">{{ d }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="col-md-4">
+          <h6 class="fw-semibold text-muted mb-2">점수 가중치 (매매 기준)</h6>
+          <div class="small">
+            <span class="me-3">💰 가격 <b>{{ config.scoring.purchase.price }}점</b></span>
+            <span class="me-3">📐 면적 <b>{{ config.scoring.purchase.area }}점</b></span><br>
+            <span class="me-3">📍 선호지역 <b>{{ config.scoring.purchase.preferred_district }}점</b></span>
+            <span>🚇 역세권 <b>{{ config.scoring.purchase.subway }}점</b></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 거래 유형별 탭 -->
+  <ul class="nav nav-tabs mb-0" id="tradeTabs" role="tablist">
+    {% for trade_type, articles in results.items() %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link {% if loop.first %}active{% endif %}"
+              id="tab-{{ trade_type }}-btn"
+              data-bs-toggle="tab"
+              data-bs-target="#tab-{{ trade_type }}"
+              type="button" role="tab">
+        {{ trade_names[trade_type] }}
+        <span class="badge bg-secondary ms-1">{{ articles|length }}건</span>
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <div class="tab-content">
+    {% for trade_type, articles in results.items() %}
+    <div class="tab-pane fade {% if loop.first %}show active{% endif %}"
+         id="tab-{{ trade_type }}" role="tabpanel">
+
+      {% set display = articles[:top_n] %}
+      {% set total_count = articles|length %}
+
+      <!-- 요약 통계 카드 -->
+      {% if display %}
+      <div class="card stat-card my-3">
+        <div class="card-body py-2">
+          <div class="row text-center g-0">
+            <div class="col border-end">
+              <div class="fw-bold fs-5 text-primary">{{ total_count }}</div>
+              <div class="text-muted" style="font-size:0.78rem">총 수집 매물</div>
+            </div>
+            <div class="col border-end">
+              <div class="fw-bold fs-5 text-success">{{ display[0].total_score }}</div>
+              <div class="text-muted" style="font-size:0.78rem">1위 점수</div>
+            </div>
+            {% if trade_type == 'A1' and display %}
+            <div class="col border-end">
+              <div class="fw-bold fs-5">
+                {{ format_price((display | map(attribute='price_man') | list | sum) // (display | length)) }}
+              </div>
+              <div class="text-muted" style="font-size:0.78rem">TOP {{ top_n }} 평균가</div>
+            </div>
+            {% endif %}
+            <div class="col border-end">
+              <div class="fw-bold fs-5 text-primary">
+                {{ display | selectattr('is_preferred') | list | length }}
+              </div>
+              <div class="text-muted" style="font-size:0.78rem">선호지역 내</div>
+            </div>
+            <div class="col">
+              <div class="fw-bold fs-5 text-success">
+                {{ display | selectattr('has_subway') | list | length }}
+              </div>
+              <div class="text-muted" style="font-size:0.78rem">역세권</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- 매물 테이블 -->
+      <div class="table-responsive rounded shadow-sm">
+        <table class="table table-hover table-bordered mb-0 bg-white">
+          <thead>
+            <tr>
+              <th class="text-center" style="width:48px">순위</th>
+              <th style="min-width:160px">매물명</th>
+              <th style="min-width:140px">주소</th>
+              <th class="text-center" style="min-width:110px">가격</th>
+              <th class="text-center" style="width:80px">평수</th>
+              <th class="text-center" style="width:70px">층수</th>
+              <th class="text-center" style="width:70px">총점</th>
+              <th style="min-width:160px">점수 상세</th>
+              <th class="text-center" style="width:60px">링크</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for art in display %}
+            {% set rank = loop.index %}
+            <tr>
+              <!-- 순위 -->
+              <td class="text-center">
+                <span class="{% if rank == 1 %}rank-1{% elif rank == 2 %}rank-2{% elif rank == 3 %}rank-3{% else %}rank-n{% endif %}">
+                  {{ rank }}
+                </span>
+              </td>
+
+              <!-- 매물명 + 태그 -->
+              <td>
+                <div class="article-name">{{ art.articleName or art.buildingName or '(이름 없음)' }}</div>
+                <div class="mt-1 d-flex flex-wrap gap-1">
+                  {% if art.realEstateTypeName %}
+                  <span class="badge bg-light text-dark border" style="font-size:0.7rem">{{ art.realEstateTypeName }}</span>
+                  {% endif %}
+                  {% if art.is_preferred %}
+                  <span class="tag-preferred">선호지역</span>
+                  {% endif %}
+                  {% if art.has_subway %}
+                  <span class="tag-subway">역세권</span>
+                  {% endif %}
+                </div>
+              </td>
+
+              <!-- 주소 -->
+              <td>
+                <div class="addr-text">{{ art.exposureAddress or '-' }}</div>
+              </td>
+
+              <!-- 가격 -->
+              <td class="text-center">
+                {% if trade_type == 'A1' %}
+                <div class="price-main">{{ format_price(art.price_man) }}</div>
+                {% else %}
+                <div class="price-main">{{ format_price(art.price_man) }}</div>
+                <div class="price-sub">월 {{ format_price(art.rent_man) }}만</div>
+                {% if art.monthly_cost %}
+                <div class="price-sub text-danger">실부담 {{ art.monthly_cost|int }}만/월</div>
+                {% endif %}
+                {% endif %}
+              </td>
+
+              <!-- 평수 -->
+              <td class="text-center">
+                <div class="fw-semibold">{{ art.pyeong }}평</div>
+                {% if art.area1 %}
+                <div style="font-size:0.75rem;color:#999">전용 {{ art.area1|round(1) }}㎡</div>
+                {% endif %}
+              </td>
+
+              <!-- 층수 -->
+              <td class="text-center text-muted">
+                {{ art.floor or '-' }}층
+              </td>
+
+              <!-- 총점 -->
+              <td class="text-center">
+                <span class="score-num {% if art.total_score >= 70 %}score-high{% elif art.total_score >= 45 %}score-mid{% else %}score-low{% endif %}">
+                  {{ art.total_score }}
+                </span>
+                <div class="progress mt-1">
+                  <div class="progress-bar {% if art.total_score >= 70 %}bg-success{% elif art.total_score >= 45 %}bg-warning{% else %}bg-danger{% endif %}"
+                       style="width:{{ art.total_score }}%"></div>
+                </div>
+              </td>
+
+              <!-- 점수 상세 -->
+              <td>
+                <div class="sub-score">
+                  {% if trade_type == 'A1' %}
+                  <div>💰 가격 <b>{{ art.score_price }}</b>/{{ config.scoring.purchase.price }}</div>
+                  <div>📐 면적 <b>{{ art.score_area }}</b>/{{ config.scoring.purchase.area }}</div>
+                  <div>📍 지역 <b>{{ art.score_district }}</b>/{{ config.scoring.purchase.preferred_district }}</div>
+                  <div>🚇 역세권 <b>{{ art.score_subway }}</b>/{{ config.scoring.purchase.subway }}</div>
+                  {% else %}
+                  <div>💸 부담금 <b>{{ art.score_price }}</b>/{{ config.scoring.monthly_rent.rent_cost }}</div>
+                  <div>📐 면적 <b>{{ art.score_area }}</b>/{{ config.scoring.monthly_rent.area }}</div>
+                  <div>📍 지역 <b>{{ art.score_district }}</b>/{{ config.scoring.monthly_rent.preferred_district }}</div>
+                  <div>🚇 역세권 <b>{{ art.score_subway }}</b>/{{ config.scoring.monthly_rent.subway }}</div>
+                  {% endif %}
+                </div>
+              </td>
+
+              <!-- 링크 -->
+              <td class="text-center">
+                <a href="{{ article_url(art.articleNo) }}"
+                   target="_blank"
+                   class="btn btn-sm btn-outline-primary px-2 py-1"
+                   style="font-size:0.78rem">보기</a>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="9" class="text-center text-muted py-5">
+                조건에 맞는 매물이 없습니다.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-muted small mt-2 mb-0">
+        * 상위 {{ top_n }}건 표시 (총 {{ total_count }}건 수집)
+        &nbsp;|&nbsp; 점수 70+ <span class="text-success fw-bold">●</span> 양호 &nbsp;
+        45~69 <span class="text-warning fw-bold">●</span> 보통 &nbsp;
+        45 미만 <span class="text-danger fw-bold">●</span> 낮음
+      </p>
+
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

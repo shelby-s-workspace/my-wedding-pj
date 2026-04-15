@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# 보고서 출력물 (로컬 전용)
+crawler/output/
+
+# 실행 로그
+*.log
+
+# 환경 변수
+.env
