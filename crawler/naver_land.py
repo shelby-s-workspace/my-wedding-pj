@@ -131,34 +131,55 @@ def format_price(price_man: int) -> str:
 class NaverLandClient:
     """네이버 부동산 비공개 API 클라이언트"""
 
-    def __init__(self, request_delay: float = 0.6) -> None:
+    def __init__(self, auth: dict | None = None, request_delay: float = 0.6) -> None:
         self.delay = request_delay
         self.client = httpx.Client(
             headers=DEFAULT_HEADERS,
             timeout=30,
             follow_redirects=True,
         )
-        self._init_session()
+        if auth:
+            self._apply_auth(auth)
+        else:
+            logger.warning("auth.yaml 없음 — 인증 없이 시도 (차단될 수 있음)")
 
-    def _init_session(self) -> None:
-        """메인 페이지 방문으로 쿠키 획득 및 Authorization 토큰 추출 시도"""
-        try:
-            resp = self.client.get(BASE_URL + "/")
-            # JS 번들에서 Authorization Bearer 토큰 추출 시도
-            patterns = [
-                r'"Authorization"\s*:\s*"(Bearer [^"]+)"',
-                r"'Authorization'\s*:\s*'(Bearer [^']+)'",
-                r'authorization["\']?\s*:\s*["\']?(Bearer\s+[\w\-\.]+)',
-            ]
-            for pattern in patterns:
-                m = re.search(pattern, resp.text, re.IGNORECASE)
-                if m:
-                    self.client.headers["Authorization"] = m.group(1)
-                    logger.info("Authorization 토큰 획득 성공")
-                    return
-            logger.info("Authorization 토큰 없이 진행 (쿠키 기반)")
-        except httpx.RequestError as e:
-            logger.warning(f"세션 초기화 실패: {e}")
+    def _apply_auth(self, auth: dict) -> None:
+        """auth.yaml에서 읽은 인증 정보를 클라이언트에 적용"""
+        PLACEHOLDER = "여기에"
+
+        authorization = auth.get("authorization", "")
+        if authorization and PLACEHOLDER not in authorization:
+            self.client.headers["Authorization"] = authorization
+            logger.info("Authorization 헤더 적용 완료")
+        else:
+            logger.warning("Authorization 값이 없거나 미입력 상태")
+
+        cookies = auth.get("cookies") or {}
+        valid = {k: v for k, v in cookies.items() if v and PLACEHOLDER not in str(v)}
+        if valid:
+            cookie_str = "; ".join(f"{k}={v}" for k, v in valid.items())
+            self.client.headers["Cookie"] = cookie_str
+            logger.info(f"쿠키 적용 완료: {list(valid.keys())}")
+        else:
+            logger.warning("유효한 쿠키 없음 — auth.yaml을 확인하세요")
+
+    def test_connection(self) -> bool:
+        """강남구 소량 조회로 API 연결 확인"""
+        logger.info("API 연결 테스트 중 (강남구)...")
+        data = self.fetch_page(
+            cortar_no="1168000000",
+            trade_type="A1",
+            price_min=60000,
+            price_max=100000,
+            area_min=49,
+            page=1,
+        )
+        if data is not None and "articles" in data:
+            count = len(data.get("articles") or [])
+            logger.info(f"연결 테스트 성공 — 강남구 매물 {count}건 수신")
+            return True
+        logger.error("연결 테스트 실패 — crawler/auth.yaml 값을 확인하세요")
+        return False
 
     def _get(self, url: str, params: dict) -> Optional[dict]:
         """GET 요청 with 에러 처리 및 재시도"""

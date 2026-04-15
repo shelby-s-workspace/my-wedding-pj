@@ -1,0 +1,24 @@
+# ============================================================
+# 네이버 부동산 인증 정보
+# ============================================================
+#
+# 이 파일을 복사해서 같은 폴더에 auth.yaml로 저장한 뒤
+# 아래 값들을 채워넣으세요.
+#
+# [쿠키 가져오는 방법]
+#  1. Chrome에서 https://new.land.naver.com 접속
+#  2. F12 → Network 탭 열기
+#  3. 지도에서 서울 아무 곳이나 클릭 (매물이 뜨면 됨)
+#  4. Network 탭 필터에 "articles" 입력
+#  5. /api/articles?... 요청 클릭 → Headers 탭
+#  6. Request Headers 섹션에서 아래 값들 복사
+#
+#  authorization  → "authorization: Bearer xxxxxx" 전체값
+#  NID_AUT, NID_SES → "cookie:" 항목에서 각각 찾아서 복사
+# ============================================================
+
+authorization: "Bearer 여기에_Authorization값_입력"
+
+cookies:
+  NID_AUT: "여기에_NID_AUT_값_입력"
+  NID_SES: "여기에_NID_SES_값_입력"

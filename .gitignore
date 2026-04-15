@@ -9,6 +9,9 @@ venv/
 # 보고서 출력물 (로컬 전용)
 crawler/output/
 
+# 인증 정보 (절대 커밋 금지)
+crawler/auth.yaml
+
 # 실행 로그
 *.log
 

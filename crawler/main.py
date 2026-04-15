@@ -37,6 +37,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
+AUTH_PATH   = Path(__file__).parent / "auth.yaml"
 OUTPUT_DIR  = Path(__file__).parent / "output"
 
 TRADE_LABEL = {"A1": "매매", "B1": "전세", "B2": "월세"}
@@ -49,6 +50,14 @@ TRADE_LABEL = {"A1": "매매", "B1": "전세", "B2": "월세"}
 def load_config() -> dict:
     with open(CONFIG_PATH, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def load_auth() -> dict:
+    if AUTH_PATH.exists():
+        with open(AUTH_PATH, encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    logger.warning("auth.yaml 없음 — auth.yaml.example을 복사해서 값을 채워주세요")
+    return {}
 
 
 def collect_articles(
@@ -97,6 +106,7 @@ def collect_articles(
 
 def main() -> None:
     config = load_config()
+    auth   = load_auth()
     OUTPUT_DIR.mkdir(exist_ok=True)
 
     preferred   = set(config["search"]["preferred_districts"])
@@ -104,7 +114,11 @@ def main() -> None:
 
     all_results: dict[str, list] = {}
 
-    with NaverLandClient() as client:
+    with NaverLandClient(auth=auth) as client:
+        if not client.test_connection():
+            logger.error("API 연결 실패. 프로그램을 종료합니다.")
+            logger.error("→ crawler/auth.yaml.example을 참고해서 auth.yaml을 만들어주세요.")
+            sys.exit(1)
         for trade_type in trade_types:
             label = TRADE_LABEL.get(trade_type, trade_type)
             logger.info(f"\n{'=' * 50}")
