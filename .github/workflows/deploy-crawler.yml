@@ -1,0 +1,71 @@
+name: "[Crawler] Deploy to Local PC"
+
+on:
+  push:
+    branches:
+      - main
+      - 'crawler/**'
+    paths:
+      - 'crawler/**'
+      - '.github/workflows/deploy-crawler.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Crawler → D:\project\claude-test\crawler
+    runs-on: [self-hosted, Windows, X64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create target directory
+        shell: powershell
+        run: |
+          $targetDir = "D:\project\claude-test\crawler"
+          if (-not (Test-Path $targetDir)) {
+            New-Item -ItemType Directory -Path $targetDir -Force
+            Write-Host "Created: $targetDir"
+          } else {
+            Write-Host "Already exists: $targetDir"
+          }
+
+      - name: Deploy crawler files
+        shell: powershell
+        run: |
+          $source = "${{ github.workspace }}\crawler"
+          $target = "D:\project\claude-test\crawler"
+
+          Write-Host "Source : $source"
+          Write-Host "Target : $target"
+
+          robocopy $source $target /E `
+            /XD "__pycache__" ".venv" "venv" "output" `
+            /XF "*.pyc" "*.pyo" "*.log" `
+            /NJH /NJS
+
+          if ($LASTEXITCODE -le 7) {
+            Write-Host "Deploy successful"
+            exit 0
+          } else {
+            Write-Host "Deploy failed (exit $LASTEXITCODE)"
+            exit 1
+          }
+
+      - name: Write deploy log
+        shell: powershell
+        run: |
+          $logPath = "D:\project\claude-test\crawler\deploy.log"
+          $entry   = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] branch=${{ github.ref_name }} commit=${{ github.sha }} by=${{ github.actor }}"
+          Add-Content -Path $logPath -Value $entry
+          Write-Host $entry
+
+      - name: Done
+        shell: powershell
+        run: |
+          Write-Host "========================================"
+          Write-Host "  [Crawler] Deploy Complete             "
+          Write-Host "  → D:\project\claude-test\crawler      "
+          Write-Host "========================================"
+          Write-Host "Branch : ${{ github.ref_name }}"
+          Write-Host "Commit : ${{ github.sha }}"

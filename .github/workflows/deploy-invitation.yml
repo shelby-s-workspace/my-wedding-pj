@@ -1,0 +1,71 @@
+name: "[Invitation] Deploy to Local PC"
+
+on:
+  push:
+    branches:
+      - main
+      - 'invitation/**'
+    paths:
+      - 'invitation/**'
+      - '.github/workflows/deploy-invitation.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Invitation → D:\project\claude-test\invitation
+    runs-on: [self-hosted, Windows, X64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create target directory
+        shell: powershell
+        run: |
+          $targetDir = "D:\project\claude-test\invitation"
+          if (-not (Test-Path $targetDir)) {
+            New-Item -ItemType Directory -Path $targetDir -Force
+            Write-Host "Created: $targetDir"
+          } else {
+            Write-Host "Already exists: $targetDir"
+          }
+
+      - name: Deploy invitation files
+        shell: powershell
+        run: |
+          $source = "${{ github.workspace }}\invitation"
+          $target = "D:\project\claude-test\invitation"
+
+          Write-Host "Source : $source"
+          Write-Host "Target : $target"
+
+          robocopy $source $target /E `
+            /XD "node_modules" ".next" "dist" ".vite" `
+            /XF "*.log" `
+            /NJH /NJS
+
+          if ($LASTEXITCODE -le 7) {
+            Write-Host "Deploy successful"
+            exit 0
+          } else {
+            Write-Host "Deploy failed (exit $LASTEXITCODE)"
+            exit 1
+          }
+
+      - name: Write deploy log
+        shell: powershell
+        run: |
+          $logPath = "D:\project\claude-test\invitation\deploy.log"
+          $entry   = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] branch=${{ github.ref_name }} commit=${{ github.sha }} by=${{ github.actor }}"
+          Add-Content -Path $logPath -Value $entry
+          Write-Host $entry
+
+      - name: Done
+        shell: powershell
+        run: |
+          Write-Host "========================================"
+          Write-Host "  [Invitation] Deploy Complete          "
+          Write-Host "  → D:\project\claude-test\invitation   "
+          Write-Host "========================================"
+          Write-Host "Branch : ${{ github.ref_name }}"
+          Write-Host "Commit : ${{ github.sha }}"
