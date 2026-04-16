@@ -15,7 +15,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://new.land.naver.com"
+BASE_URL = "https://fin.land.naver.com"
 API_BASE = f"{BASE_URL}/api"
 
 # 브라우저와 동일한 헤더 구성
@@ -24,7 +24,7 @@ DEFAULT_HEADERS: dict[str, str] = {
     "Accept-Encoding": "gzip, deflate, br",
     "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
     "Connection": "keep-alive",
-    "Referer": "https://new.land.naver.com/",
+    "Referer": "https://fin.land.naver.com/",
     "Sec-Fetch-Dest": "empty",
     "Sec-Fetch-Mode": "cors",
     "Sec-Fetch-Site": "same-origin",
