@@ -1,9 +1,12 @@
 """
 부동산 매물 분석 프로그램 — 진입점
 
+[데이터 소스]
+  직방(Zigbang) API — AWS EC2 환경에서 접근 가능
+
 [실행 방법]
-  pip install -r requirements.txt
-  python main.py
+  py -m pip install -r requirements.txt
+  py main.py
 
 [출력]
   output/report_YYYYMMDD_HHMMSS.html — HTML 분석 보고서
@@ -18,7 +21,7 @@ from pathlib import Path
 
 import yaml
 
-from naver_land import NaverLandClient, DISTRICT_CODES
+from zigbang import ZigbangClient, SEOUL_DISTRICTS
 from scorer import score_article
 from report import generate_report
 
@@ -37,7 +40,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 CONFIG_PATH = Path(__file__).parent / "config.yaml"
-AUTH_PATH   = Path(__file__).parent / "auth.yaml"
 OUTPUT_DIR  = Path(__file__).parent / "output"
 
 TRADE_LABEL = {"A1": "매매", "B1": "전세", "B2": "월세"}
@@ -52,16 +54,8 @@ def load_config() -> dict:
         return yaml.safe_load(f)
 
 
-def load_auth() -> dict:
-    if AUTH_PATH.exists():
-        with open(AUTH_PATH, encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
-    logger.warning("auth.yaml 없음 — auth.yaml.example을 복사해서 값을 채워주세요")
-    return {}
-
-
 def collect_articles(
-    client: NaverLandClient,
+    client: ZigbangClient,
     config: dict,
     trade_type: str,
 ) -> list[dict]:
@@ -75,25 +69,36 @@ def collect_articles(
         price_min = 0
         price_max = search["monthly_rent"]["max_deposit"]
 
-    seen: set[str] = set()
+    seen:     set[str]   = set()
     articles: list[dict] = []
 
-    for district, cortar_no in DISTRICT_CODES.items():
-        logger.info(f"  [{district}] 검색 중...")
-        raw = client.fetch_all(
-            cortar_no=cortar_no,
+    for district_query in SEOUL_DISTRICTS:
+        district_name = district_query.replace("서울 ", "")
+        logger.info(f"  [{district_name}] 검색 중...")
+
+        # 1) 구 이름 → areaId
+        area_id = client.get_area_id(district_query)
+        if not area_id:
+            logger.warning(f"    → areaId 없음, 건너뜀")
+            continue
+
+        # 2) areaId → 매물 목록
+        items = client.fetch_items(
+            area_id=area_id,
             trade_type=trade_type,
             price_min=price_min,
             price_max=price_max,
-            area_min=search["min_area_sqm"],
+            area_min_sqm=search["min_area_sqm"],
         )
+
         new_cnt = 0
-        for art in raw:
+        for art in items:
             art_no = art.get("articleNo", "")
             if art_no and art_no not in seen:
                 seen.add(art_no)
                 articles.append(art)
                 new_cnt += 1
+
         if new_cnt:
             logger.info(f"    → {new_cnt}건 신규 (누적 {len(articles)}건)")
 
@@ -106,19 +111,17 @@ def collect_articles(
 
 def main() -> None:
     config = load_config()
-    auth   = load_auth()
     OUTPUT_DIR.mkdir(exist_ok=True)
 
     preferred   = set(config["search"]["preferred_districts"])
     trade_types = config["search"]["trade_types"]
-
     all_results: dict[str, list] = {}
 
-    with NaverLandClient(auth=auth) as client:
+    with ZigbangClient() as client:
         if not client.test_connection():
-            logger.error("API 연결 실패. 프로그램을 종료합니다.")
-            logger.error("→ crawler/auth.yaml.example을 참고해서 auth.yaml을 만들어주세요.")
+            logger.error("직방 API 연결 실패. 네트워크를 확인하세요.")
             sys.exit(1)
+
         for trade_type in trade_types:
             label = TRADE_LABEL.get(trade_type, trade_type)
             logger.info(f"\n{'=' * 50}")
@@ -141,7 +144,6 @@ def main() -> None:
                 f"선호지역: {sum(1 for a in scored if a['is_preferred'])}건"
             )
 
-    # 보고서 생성
     timestamp   = datetime.now().strftime("%Y%m%d_%H%M%S")
     report_path = OUTPUT_DIR / f"report_{timestamp}.html"
     generate_report(all_results, config, report_path)
